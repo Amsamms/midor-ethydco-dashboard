@@ -2240,44 +2240,44 @@ def generate_html(metrics):
         .rtl .ar-only {{ display: block; }}
 
         /* ============================================
-           KNOWLEDGE BASE TAB STYLES
+           KNOWLEDGE BASE TAB STYLES - MOBILE FIRST
            ============================================ */
 
-        /* KB Header */
+        /* KB Header - Compact for mobile */
         .kb-header {{
-            margin-bottom: 25px;
+            margin-bottom: 15px;
         }}
 
         .company-info-card {{
             background: var(--glass);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 24px;
-            padding: 30px;
+            border-radius: 16px;
+            padding: 15px;
             display: flex;
             align-items: center;
-            gap: 25px;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 12px;
         }}
 
         .company-logo {{
-            width: 80px;
-            height: 80px;
+            width: 45px;
+            height: 45px;
             background: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
-            border-radius: 20px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 36px;
+            font-size: 20px;
             font-weight: 800;
             color: white;
-            box-shadow: 0 10px 30px rgba(34, 197, 94, 0.3);
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
             flex-shrink: 0;
         }}
 
         .company-details h2 {{
-            font-size: 1.4rem;
-            margin-bottom: 5px;
+            font-size: 1rem;
+            margin-bottom: 2px;
             background: linear-gradient(90deg, var(--white) 0%, var(--secondary) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -2285,32 +2285,29 @@ def generate_html(metrics):
 
         .company-details p {{
             color: var(--gray);
-            font-size: 1rem;
+            font-size: 0.8rem;
         }}
 
-        /* KB Controls */
+        /* KB Controls - Stacked on mobile */
         .kb-controls {{
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 10px;
         }}
 
         .search-box {{
             position: relative;
-            flex: 1;
-            max-width: 400px;
+            width: 100%;
         }}
 
         .search-box input {{
             width: 100%;
-            padding: 14px 20px 14px 50px;
+            padding: 12px 15px 12px 42px;
             background: var(--glass);
             border: 1px solid var(--glass-border);
-            border-radius: 12px;
+            border-radius: 10px;
             color: var(--white);
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-family: inherit;
             outline: none;
             transition: all 0.3s ease;
@@ -2318,42 +2315,44 @@ def generate_html(metrics):
 
         .search-box input:focus {{
             border-color: var(--primary);
-            box-shadow: 0 0 20px rgba(14, 165, 233, 0.2);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.2);
         }}
 
         .search-box .search-icon {{
             position: absolute;
-            left: 18px;
+            left: 14px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 1.2rem;
+            font-size: 1rem;
         }}
 
         .rtl .search-box .search-icon {{
             left: auto;
-            right: 18px;
+            right: 14px;
         }}
 
         .rtl .search-box input {{
-            padding: 14px 50px 14px 20px;
+            padding: 12px 42px 12px 15px;
         }}
 
-        /* Unit Toggle */
+        /* Unit Toggle - Full width on mobile */
         .unit-toggle {{
             display: flex;
             background: var(--glass);
             border-radius: 10px;
-            padding: 4px;
+            padding: 3px;
             border: 1px solid var(--glass-border);
+            width: 100%;
         }}
 
         .unit-btn {{
-            padding: 10px 20px;
+            flex: 1;
+            padding: 10px 15px;
             border: none;
             background: transparent;
             color: var(--gray);
-            font-size: 0.9rem;
-            font-weight: 500;
+            font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
             border-radius: 8px;
             transition: all 0.3s ease;
@@ -2365,30 +2364,38 @@ def generate_html(metrics):
             color: var(--white);
         }}
 
-        /* Category Navigation */
+        /* Category Navigation - Horizontal scroll on mobile */
         .category-nav {{
             display: flex;
-            gap: 10px;
-            padding: 20px 0;
-            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px 0;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
             border-bottom: 1px solid var(--glass-border);
-            margin-bottom: 25px;
+            margin-bottom: 15px;
+        }}
+
+        .category-nav::-webkit-scrollbar {{
+            display: none;
         }}
 
         .cat-btn {{
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
+            gap: 6px;
+            padding: 10px 14px;
             background: var(--glass);
             border: 1px solid var(--glass-border);
             border-radius: 10px;
             color: var(--gray);
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.3s ease;
             font-family: inherit;
+            white-space: nowrap;
+            flex-shrink: 0;
         }}
 
         .cat-btn:hover {{
@@ -2404,37 +2411,238 @@ def generate_html(metrics):
         }}
 
         .cat-icon {{
-            font-size: 1.1rem;
+            font-size: 1rem;
         }}
 
         .cat-count {{
             background: rgba(255,255,255,0.2);
-            padding: 2px 8px;
+            padding: 2px 6px;
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
         }}
 
-        /* KB Cards Grid */
+        /* KB Cards Grid - Single column on mobile, cards first */
         .kb-cards-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
         }}
 
-        /* KB Card */
+        /* Active filter indicator */
+        .filter-indicator {{
+            display: none;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+            border: 1px solid var(--primary);
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.85rem;
+            color: var(--secondary);
+        }}
+
+        .filter-indicator.visible {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }}
+
+        .filter-indicator .clear-btn {{
+            background: none;
+            border: none;
+            color: var(--gray);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 2px 8px;
+        }}
+
+        /* Collapsible Charts Section - At bottom */
+        .kb-charts-section {{
+            margin-top: 25px;
+            border-top: 1px solid var(--glass-border);
+            padding-top: 15px;
+        }}
+
+        .charts-toggle {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }}
+
+        .charts-toggle:hover {{
+            border-color: var(--primary);
+        }}
+
+        .charts-toggle h3 {{
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+
+        .charts-toggle .toggle-arrow {{
+            color: var(--gray);
+            font-size: 1rem;
+            transition: transform 0.3s ease;
+        }}
+
+        .charts-toggle.expanded .toggle-arrow {{
+            transform: rotate(180deg);
+        }}
+
+        .kb-charts-content {{
+            display: none;
+            padding-top: 10px;
+        }}
+
+        .kb-charts-content.visible {{
+            display: block;
+        }}
+
+        .kb-charts-content .chart-grid {{
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }}
+
+        .kb-charts-content .chart-card {{
+            min-height: 280px;
+        }}
+
+        /* Collapsible Definitions Section */
+        .definitions-section {{
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px solid var(--glass-border);
+        }}
+
+        .definitions-toggle {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }}
+
+        .definitions-toggle:hover {{
+            border-color: var(--secondary);
+        }}
+
+        .definitions-toggle h3 {{
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+
+        .definitions-toggle .toggle-arrow {{
+            color: var(--gray);
+            font-size: 1rem;
+            transition: transform 0.3s ease;
+        }}
+
+        .definitions-toggle.expanded .toggle-arrow {{
+            transform: rotate(180deg);
+        }}
+
+        .definitions-content {{
+            display: none;
+        }}
+
+        .definitions-content.visible {{
+            display: block;
+        }}
+
+        /* Desktop adjustments */
+        @media (min-width: 768px) {{
+            .company-info-card {{
+                padding: 20px;
+                gap: 20px;
+            }}
+
+            .company-logo {{
+                width: 60px;
+                height: 60px;
+                font-size: 28px;
+            }}
+
+            .company-details h2 {{
+                font-size: 1.2rem;
+            }}
+
+            .kb-controls {{
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }}
+
+            .search-box {{
+                max-width: 350px;
+            }}
+
+            .unit-toggle {{
+                width: auto;
+            }}
+
+            .kb-cards-grid {{
+                grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+                gap: 15px;
+            }}
+
+            .kb-charts-content .chart-grid {{
+                grid-template-columns: repeat(2, 1fr);
+            }}
+        }}
+
+        @media (min-width: 1024px) {{
+            .company-info-card {{
+                padding: 25px;
+            }}
+
+            .company-logo {{
+                width: 70px;
+                height: 70px;
+                font-size: 32px;
+            }}
+
+            .company-details h2 {{
+                font-size: 1.3rem;
+            }}
+
+            .kb-cards-grid {{
+                grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            }}
+        }}
+
+        /* KB Card - Mobile first */
         .kb-card {{
             background: var(--glass);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px;
+            border-radius: 14px;
             overflow: hidden;
             transition: all 0.3s ease;
         }}
 
         .kb-card:hover {{
             border-color: var(--primary);
-            box-shadow: 0 10px 40px rgba(14, 165, 233, 0.15);
+            box-shadow: 0 5px 20px rgba(14, 165, 233, 0.15);
         }}
 
         .kb-card.hidden {{
@@ -2444,9 +2652,9 @@ def generate_html(metrics):
         .kb-card-header {{
             display: flex;
             align-items: center;
-            padding: 20px;
+            padding: 12px 14px;
             cursor: pointer;
-            gap: 15px;
+            gap: 10px;
             border-bottom: 1px solid transparent;
             transition: all 0.3s ease;
         }}
@@ -2456,14 +2664,14 @@ def generate_html(metrics):
         }}
 
         .kb-card-icon {{
-            width: 50px;
-            height: 50px;
+            width: 38px;
+            height: 38px;
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            border-radius: 12px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
+            font-size: 1.1rem;
             flex-shrink: 0;
         }}
 
@@ -2473,16 +2681,16 @@ def generate_html(metrics):
         }}
 
         .kb-card-title h3 {{
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }}
 
         .kb-card-subtitle {{
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             color: var(--gray);
         }}
 
@@ -2499,7 +2707,7 @@ def generate_html(metrics):
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-            gap: 2px;
+            gap: 1px;
         }}
 
         .rtl .summary-value {{
@@ -2507,24 +2715,24 @@ def generate_html(metrics):
         }}
 
         .summary-value .design-value {{
-            font-size: 1.2rem;
+            font-size: 1rem;
             font-weight: 700;
             color: var(--secondary);
         }}
 
         .summary-value .actual-value {{
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: var(--success);
         }}
 
         .summary-value .unit {{
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             color: var(--gray);
         }}
 
         .kb-card-expand {{
-            width: 30px;
-            height: 30px;
+            width: 26px;
+            height: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -2534,6 +2742,7 @@ def generate_html(metrics):
         .expand-icon {{
             transition: transform 0.3s ease;
             color: var(--gray);
+            font-size: 0.9rem;
         }}
 
         .kb-card.expanded .expand-icon {{
@@ -2543,7 +2752,7 @@ def generate_html(metrics):
         /* Card Body */
         .kb-card-body {{
             display: none;
-            padding: 20px;
+            padding: 14px;
             animation: slideDown 0.3s ease;
         }}
 
@@ -2558,17 +2767,17 @@ def generate_html(metrics):
 
         /* Capacity Section */
         .capacity-section {{
-            margin-bottom: 20px;
-            padding: 15px;
+            margin-bottom: 15px;
+            padding: 12px;
             background: rgba(0,0,0,0.2);
-            border-radius: 12px;
+            border-radius: 10px;
         }}
 
         .capacity-row {{
             display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
         }}
 
         .capacity-row .label {{
@@ -2586,18 +2795,44 @@ def generate_html(metrics):
         }}
 
         .capacity-bar {{
-            height: 8px;
+            height: 6px;
             background: rgba(255,255,255,0.1);
-            border-radius: 4px;
-            margin-top: 10px;
+            border-radius: 3px;
+            margin-top: 8px;
             overflow: hidden;
         }}
 
         .bar-fill {{
             height: 100%;
             background: linear-gradient(90deg, var(--success) 0%, var(--secondary) 100%);
-            border-radius: 4px;
+            border-radius: 3px;
             transition: width 0.5s ease;
+        }}
+
+        /* Desktop card adjustments */
+        @media (min-width: 768px) {{
+            .kb-card-header {{
+                padding: 15px 18px;
+                gap: 12px;
+            }}
+
+            .kb-card-icon {{
+                width: 45px;
+                height: 45px;
+                font-size: 1.2rem;
+            }}
+
+            .kb-card-title h3 {{
+                font-size: 0.95rem;
+            }}
+
+            .summary-value .design-value {{
+                font-size: 1.1rem;
+            }}
+
+            .kb-card-body {{
+                padding: 18px;
+            }}
         }}
 
         /* Composition Section */
@@ -2831,50 +3066,26 @@ def generate_html(metrics):
             font-size: 0.85rem;
             color: var(--gray);
             line-height: 1.5;
+            display: none;
         }}
 
-        /* KB Responsive */
-        @media (max-width: 900px) {{
-            .kb-cards-grid {{
-                grid-template-columns: 1fr;
-            }}
-
-            .company-info-card {{
-                flex-direction: column;
-                text-align: center;
-            }}
-
-            .kb-controls {{
-                flex-direction: column;
-            }}
-
-            .search-box {{
-                max-width: 100%;
-                width: 100%;
-            }}
-        }}
-
+        /* Mobile routing */
         @media (max-width: 480px) {{
-            .category-nav {{
-                justify-content: center;
-            }}
-
-            .cat-btn {{
-                padding: 10px 14px;
-                font-size: 0.8rem;
-            }}
-
-            .kb-card-header {{
-                flex-wrap: wrap;
-            }}
-
             .routing-flow {{
                 flex-direction: column;
-                align-items: flex-start;
+                align-items: stretch;
+                gap: 8px;
             }}
 
             .route-arrow {{
                 transform: rotate(90deg);
+                align-self: center;
+            }}
+
+            .route-node {{
+                text-align: center;
+                padding: 10px 14px;
+                font-size: 0.85rem;
             }}
         }}
     </style>
@@ -3215,45 +3426,63 @@ def generate_html(metrics):
                 </button>
             </div>
 
-            <!-- Charts Section -->
-            <div class="kb-charts-section">
-                <div class="chart-grid">
-                    <div class="chart-card">
-                        <div class="chart-title">
-                            <span class="en-only">Design vs Actual Capacity</span>
-                            <span class="ar-only">السعة التصميمية مقابل الفعلية</span>
-                        </div>
-                        <div id="chart-kb-design-en"></div>
-                        <div id="chart-kb-design-ar"></div>
-                    </div>
-                    <div class="chart-card">
-                        <div class="chart-title">
-                            <span class="en-only">ETHYDCO Process Flow</span>
-                            <span class="ar-only">مسار العمليات في إيثيدكو</span>
-                        </div>
-                        <div id="chart-kb-routing-en"></div>
-                        <div id="chart-kb-routing-ar"></div>
-                    </div>
-                </div>
+            <!-- Filter Indicator -->
+            <div class="filter-indicator" id="filter-indicator">
+                <span id="filter-text"></span>
+                <button class="clear-btn" onclick="clearFilters()">✕</button>
             </div>
 
-            <!-- Expandable Cards Grid -->
-            <div class="chart-title" style="margin: 30px 0 20px 0; font-size: 1.2rem;">
-                <span class="en-only">Stream & Product Details</span>
-                <span class="ar-only">تفاصيل التيارات والمنتجات</span>
-            </div>
+            <!-- CARDS FIRST - Primary Content -->
             <div class="kb-cards-grid" id="kb-cards-container">
                 {kb_cards_html}
             </div>
 
-            <!-- Definitions Section -->
-            <div class="definitions-section">
-                <div class="chart-title" style="margin-bottom: 20px;">
-                    <span class="en-only">Glossary / Definitions</span>
-                    <span class="ar-only">المصطلحات والتعريفات</span>
+            <!-- Collapsible Charts Section - AT BOTTOM -->
+            <div class="kb-charts-section">
+                <div class="charts-toggle" onclick="toggleChartsSection(this)">
+                    <h3>
+                        <span>📊</span>
+                        <span class="en-only">Charts & Visualizations</span>
+                        <span class="ar-only">الرسوم البيانية</span>
+                    </h3>
+                    <span class="toggle-arrow">▼</span>
                 </div>
-                <div class="definitions-grid" id="definitions-container">
-                    {definitions_html}
+                <div class="kb-charts-content" id="kb-charts-content">
+                    <div class="chart-grid">
+                        <div class="chart-card">
+                            <div class="chart-title">
+                                <span class="en-only">Design vs Actual Capacity</span>
+                                <span class="ar-only">السعة التصميمية مقابل الفعلية</span>
+                            </div>
+                            <div id="chart-kb-design-en"></div>
+                            <div id="chart-kb-design-ar"></div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">
+                                <span class="en-only">ETHYDCO Process Flow</span>
+                                <span class="ar-only">مسار العمليات في إيثيدكو</span>
+                            </div>
+                            <div id="chart-kb-routing-en"></div>
+                            <div id="chart-kb-routing-ar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collapsible Definitions Section - AT BOTTOM -->
+            <div class="definitions-section">
+                <div class="definitions-toggle" onclick="toggleDefinitionsSection(this)">
+                    <h3>
+                        <span>📖</span>
+                        <span class="en-only">Glossary / Definitions</span>
+                        <span class="ar-only">المصطلحات والتعريفات</span>
+                    </h3>
+                    <span class="toggle-arrow">▼</span>
+                </div>
+                <div class="definitions-content" id="definitions-content">
+                    <div class="definitions-grid" id="definitions-container">
+                        {definitions_html}
+                    </div>
                 </div>
             </div>
         </div>
@@ -3367,10 +3596,6 @@ def generate_html(metrics):
             card.classList.toggle('expanded');
         }}
 
-        function toggleDefinition(toggle) {{
-            toggle.classList.toggle('expanded');
-        }}
-
         function toggleDefCard(card) {{
             var detailed = card.querySelector('.def-detailed');
             if (detailed) {{
@@ -3378,6 +3603,26 @@ def generate_html(metrics):
                 detailed.style.display = isExpanded ? 'none' : 'block';
                 card.classList.toggle('expanded', !isExpanded);
             }}
+        }}
+
+        // Toggle collapsible charts section
+        function toggleChartsSection(toggle) {{
+            toggle.classList.toggle('expanded');
+            var content = document.getElementById('kb-charts-content');
+            content.classList.toggle('visible');
+            if (content.classList.contains('visible')) {{
+                setTimeout(() => {{
+                    window.dispatchEvent(new Event('resize'));
+                    renderCharts(currentLang);
+                }}, 100);
+            }}
+        }}
+
+        // Toggle collapsible definitions section
+        function toggleDefinitionsSection(toggle) {{
+            toggle.classList.toggle('expanded');
+            var content = document.getElementById('definitions-content');
+            content.classList.toggle('visible');
         }}
 
         function filterCategory(category) {{
@@ -3388,18 +3633,52 @@ def generate_html(metrics):
                 btn.classList.toggle('active', btn.dataset.cat === category);
             }});
 
-            // Apply filter
+            // Apply filter and update indicator
             applyFilters();
+            updateFilterIndicator();
         }}
 
         function filterKB() {{
             applyFilters();
+            updateFilterIndicator();
+        }}
+
+        function clearFilters() {{
+            currentCategory = 'all';
+            document.getElementById('kb-search').value = '';
+            document.querySelectorAll('.cat-btn').forEach(btn => {{
+                btn.classList.toggle('active', btn.dataset.cat === 'all');
+            }});
+            applyFilters();
+            updateFilterIndicator();
+        }}
+
+        function updateFilterIndicator() {{
+            var indicator = document.getElementById('filter-indicator');
+            var filterText = document.getElementById('filter-text');
+            var searchTerm = document.getElementById('kb-search').value;
+
+            var hasFilter = currentCategory !== 'all' || searchTerm;
+            indicator.classList.toggle('visible', hasFilter);
+
+            if (hasFilter) {{
+                var parts = [];
+                if (currentCategory !== 'all') {{
+                    var catNames = {{ feeds: 'Feeds', products: 'Products', flares: 'Flares', fuel: 'Fuel Gas', other: 'Other' }};
+                    parts.push(catNames[currentCategory] || currentCategory);
+                }}
+                if (searchTerm) {{
+                    parts.push('"' + searchTerm + '"');
+                }}
+                filterText.textContent = 'Showing: ' + parts.join(' + ');
+            }}
         }}
 
         function applyFilters() {{
             var searchTerm = (document.getElementById('kb-search').value || '').toLowerCase();
             var cards = document.querySelectorAll('.kb-card');
             var counts = {{ all: 0, feeds: 0, products: 0, flares: 0, fuel: 0, other: 0 }};
+            var visibleCount = 0;
 
             cards.forEach(card => {{
                 var category = card.dataset.category;
@@ -3412,6 +3691,7 @@ def generate_html(metrics):
                 card.classList.toggle('hidden', !visible);
 
                 if (visible) {{
+                    visibleCount++;
                     counts.all++;
                     if (counts[category] !== undefined) counts[category]++;
                 }}
@@ -3422,6 +3702,14 @@ def generate_html(metrics):
                 var el = document.getElementById('count-' + cat);
                 if (el) el.textContent = counts[cat];
             }});
+
+            // Scroll to cards if filtering
+            if (currentCategory !== 'all' || searchTerm) {{
+                var cardsContainer = document.getElementById('kb-cards-container');
+                if (cardsContainer && visibleCount > 0) {{
+                    cardsContainer.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                }}
+            }}
         }}
 
         function setUnit(unit) {{
