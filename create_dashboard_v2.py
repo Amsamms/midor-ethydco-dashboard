@@ -2,12 +2,519 @@
 """
 MIDOR-ETHYDCO Integration Dashboard V2
 Modern, stunning design with language toggle
+Includes ETHYDCO Knowledge Base tab
 """
 
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import json
+
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+OPERATING_HOURS_PER_YEAR = 8000
+
+# ============================================================================
+# ETHYDCO DATA STRUCTURE
+# ============================================================================
+
+def load_ethydco_data():
+    """Load ETHYDCO questionnaire data."""
+    return {
+        'company_info': {
+            'name': 'ETHYDCO',
+            'name_ar': 'إيثيدكو',
+            'full_name': 'Egyptian Ethylene & Derivatives Company',
+            'full_name_ar': 'الشركة المصرية للإيثيلين ومشتقاته',
+            'scope': 'Polyethylene Production "Petrochemicals"',
+            'scope_ar': 'إنتاج البولي إيثيلين "البتروكيماويات"'
+        },
+
+        'feeds': [
+            {
+                'id': 'feed_main',
+                'name': 'Feed',
+                'name_ar': 'التغذية',
+                'category': 'feeds',
+                'design_value': 81.3,
+                'design_unit': 'T/hr',
+                'actual_value': {'min': 65, 'max': 70},
+                'actual_unit': 'T/hr',
+                'data_source': 'Material Balance',
+                'comment': 'Gap is (11-16) T/hr to design capacity',
+                'comment_ar': 'الفجوة (11-16) طن/ساعة عن السعة التصميمية',
+                'routing': {
+                    'source': 'GASCO Pipeline',
+                    'source_ar': 'خط أنابيب جاسكو',
+                    'destination': 'Steam Crackers (via Purification)',
+                    'destination_ar': 'التكسير البخاري (عبر التنقية)'
+                }
+            },
+            {
+                'id': 'feed_composition',
+                'name': 'Feed Composition',
+                'name_ar': 'تركيب التغذية',
+                'category': 'feeds',
+                'description': 'Feed to Crackers is a mixture of Ethane & Propane',
+                'description_ar': 'التغذية للتكسير هي خليط من الإيثان والبروبان',
+                'composition': {'C2 (Ethane)': 95, 'C3 (Propane)': 5},
+                'composition_unit': 'wt%',
+                'data_source': 'Material Balance',
+                'comment': 'Propane content range in feed is (5-15) wt%',
+                'comment_ar': 'نسبة البروبان في التغذية (5-15) وزني%'
+            },
+            {
+                'id': 'feed_impurities',
+                'name': 'Feed Impurities',
+                'name_ar': 'شوائب التغذية',
+                'category': 'feeds',
+                'fresh_feed': {
+                    'CO2': {'value': 17.0, 'unit': 'mol%'},
+                    'H2S': {'value': 100, 'unit': 'ppm mol'},
+                    'Hg': {'value': 140, 'unit': 'ppb wt'}
+                },
+                'treated_feed': {
+                    'CO2': {'value': '<100', 'unit': 'ppmw'},
+                    'H2S': 'zero',
+                    'Hg': 'zero'
+                },
+                'data_source': 'Material Balance',
+                'comment': 'Fresh feed from GASCO is treated in purification units to remove CO2, H2S, Hg before cracking',
+                'comment_ar': 'تتم معالجة التغذية من جاسكو في وحدات التنقية لإزالة الشوائب قبل التكسير'
+            },
+            {
+                'id': 'feed_limitations',
+                'name': 'Feed Limitations',
+                'name_ar': 'قيود التغذية',
+                'category': 'feeds',
+                'limitations': [
+                    'C4+ is not permitted in the feed',
+                    'Vapor phase only',
+                    'P (min) = 8 kg/cm²g',
+                    'T = ambient'
+                ],
+                'limitations_ar': [
+                    'لا يُسمح بوجود C4+ في التغذية',
+                    'طور بخاري فقط',
+                    'الضغط (أدنى) = 8 كجم/سم² مقياس',
+                    'درجة الحرارة = محيطة'
+                ],
+                'conditions': {
+                    'pressure': {'min': 8, 'unit': 'kg/cm²g'},
+                    'temperature': 'ambient',
+                    'phase': 'Vapor'
+                },
+                'data_source': 'Material Balance'
+            }
+        ],
+
+        'products': [
+            {
+                'id': 'ethylene_polymer',
+                'name': 'Ethylene Polymer Grade',
+                'name_ar': 'إيثيلين درجة البوليمر',
+                'category': 'products',
+                'design_value': 460000,
+                'design_unit': 'T/Year',
+                'actual_value': None,
+                'data_source': 'Material Balance',
+                'comment': 'A feedstock for Polyethylene production',
+                'comment_ar': 'مادة خام لإنتاج البولي إيثيلين',
+                'definition_key': 'ethylene',
+                'routing': {
+                    'source': 'Ethylene Fractionator',
+                    'source_ar': 'مجزئ الإيثيلين',
+                    'destination': 'Polyethylene Plant',
+                    'destination_ar': 'مصنع البولي إيثيلين'
+                }
+            },
+            {
+                'id': 'h2_offgas',
+                'name': 'H2 Offgas',
+                'name_ar': 'غاز الهيدروجين',
+                'category': 'products',
+                'design_value': 6.812,
+                'design_unit': 'T/hr',
+                'actual_value': {'min': 4, 'max': 4.5},
+                'actual_unit': 'T/hr',
+                'composition': {
+                    'H2': {'min': 87, 'max': 90},
+                    'CO': 0.27,
+                    'CH4': {'min': 8.5, 'max': 11.5},
+                    'C2H4': 0.25
+                },
+                'composition_unit': 'mol%',
+                'conditions': {'P': 3, 'P_unit': 'kg/cm²g', 'T': 39, 'T_unit': '°C'},
+                'data_source': 'Material Balance',
+                'definition_key': 'h2_offgas',
+                'routing': {
+                    'source': 'Cold Box / PSA',
+                    'source_ar': 'الصندوق البارد',
+                    'destination': 'Fuel Gas Mixing Drum',
+                    'destination_ar': 'خلاط غاز الوقود'
+                }
+            },
+            {
+                'id': 'methane_offgas',
+                'name': 'Methane Offgas',
+                'name_ar': 'غاز الميثان',
+                'category': 'products',
+                'design_value': {'min': 4.5, 'max': 6.2},
+                'design_unit': 'T/hr',
+                'actual_value': {'min': 3, 'max': 4.5},
+                'actual_unit': 'T/hr',
+                'composition': {
+                    'CH4': {'min': 76, 'max': 82.5},
+                    'H2': {'min': 17, 'max': 22},
+                    'CO': 0.3
+                },
+                'composition_unit': 'mol%',
+                'conditions': {'P': 3.2, 'P_unit': 'kg/cm²g', 'T': 24.5, 'T_unit': '°C'},
+                'data_source': 'Material Balance',
+                'definition_key': 'methane_offgas',
+                'routing': {
+                    'source': 'Demethanizer Overhead',
+                    'source_ar': 'أعلى عمود الميثان',
+                    'destination': 'Fuel Gas Mixing Drum',
+                    'destination_ar': 'خلاط غاز الوقود'
+                }
+            },
+            {
+                'id': 'c3_stream',
+                'name': 'C3s Stream (De-C3 Overhead)',
+                'name_ar': 'تيار C3 (أعلى عمود إزالة البروبان)',
+                'category': 'products',
+                'design_value': {'min': 2.9, 'max': 4.3},
+                'design_unit': 'T/hr',
+                'actual_value': {'min': 2, 'max': 3},
+                'actual_unit': 'T/hr',
+                'composition': {
+                    'Propylene': {'min': 69.5, 'max': 74},
+                    'Propane': {'min': 24, 'max': 28},
+                    'C2s': 0.18,
+                    'Propyne': 3
+                },
+                'composition_unit': 'mol%',
+                'conditions': {'P': 32, 'P_unit': 'kg/cm²g', 'T': -1, 'T_unit': '°C'},
+                'data_source': 'Material Balance',
+                'definition_key': 'propylene',
+                'routing': {
+                    'source': 'De-C3 Column Overhead',
+                    'source_ar': 'أعلى عمود C3',
+                    'destination': 'Fuel Gas / LPG Export',
+                    'destination_ar': 'غاز الوقود / تصدير الغاز المسال'
+                }
+            },
+            {
+                'id': 'c4_stream',
+                'name': 'C4s Stream',
+                'name_ar': 'تيار C4 (البيوتان)',
+                'category': 'products',
+                'design_value': 0.9,
+                'design_unit': 'T/hr',
+                'actual_value': 0.7,
+                'actual_unit': 'T/hr',
+                'composition': {
+                    'n-Butane': {'min': 37, 'max': 50},
+                    'Butene-1': {'min': 23, 'max': 30},
+                    'Butene-2': {'min': 18, 'max': 21}
+                },
+                'composition_unit': 'mol%',
+                'conditions': {'P': 31, 'P_unit': 'kg/cm²g', 'T': 41, 'T_unit': '°C'},
+                'data_source': 'Material Balance',
+                'definition_key': 'lpg',
+                'routing': {
+                    'source': 'De-C4 Column',
+                    'source_ar': 'عمود C4',
+                    'destination': 'Butadiene Unit / LPG Export',
+                    'destination_ar': 'وحدة البيوتادايين / التصدير'
+                }
+            },
+            {
+                'id': 'butadiene',
+                'name': '1,3 Butadiene',
+                'name_ar': 'البيوتادايين 1,3',
+                'category': 'products',
+                'design_value': 20000,
+                'design_unit': 'T/Year',
+                'actual_value': None,
+                'data_source': 'Material Balance',
+                'definition_key': 'butadiene',
+                'routing': {
+                    'source': 'Butadiene Extraction Unit',
+                    'source_ar': 'وحدة استخلاص البيوتادايين',
+                    'destination': 'Export / SBR Production',
+                    'destination_ar': 'تصدير / إنتاج المطاط'
+                }
+            },
+            {
+                'id': 'pygas',
+                'name': 'Pyrolysis Gasoline',
+                'name_ar': 'بنزين التكسير',
+                'category': 'products',
+                'design_value': {'min': 100, 'max': 400},
+                'design_unit': 'Kg/hr',
+                'actual_value': {'min': 70, 'max': 250},
+                'actual_unit': 'Kg/hr',
+                'composition': {
+                    'Toluene/Xylene/EB': 3.5,
+                    'C9-204°C': 48,
+                    'Styrene': 23,
+                    'PGO (204-288°C)': 20
+                },
+                'composition_unit': 'mol%',
+                'comment': 'PG from quench tower',
+                'comment_ar': 'بنزين التكسير من برج التبريد',
+                'data_source': 'Material Balance',
+                'definition_key': 'pyrolysis_gasoline',
+                'routing': {
+                    'source': 'Quench Tower Bottoms',
+                    'source_ar': 'قاع برج التبريد',
+                    'destination': 'Fuel System / Gasoline Blending',
+                    'destination_ar': 'نظام الوقود / مزج البنزين'
+                }
+            }
+        ],
+
+        'flared_gases': [
+            {
+                'id': 'ethylene_flare',
+                'name': 'Ethylene Plant Flare',
+                'name_ar': 'شعلة مصنع الإيثيلين',
+                'category': 'flares',
+                'flare_type': 'Steam assisted flare',
+                'flare_type_ar': 'شعلة مساعدة بالبخار',
+                'flow': 'Non-routine flaring',
+                'flow_ar': 'حرق غير روتيني',
+                'comment': 'Flaring just in cases of upsets and S/D, not measured',
+                'comment_ar': 'الحرق فقط في حالات الاضطرابات والإيقاف، غير مقاس',
+                'is_measured': False,
+                'routing': {
+                    'source': 'Ethylene Plant Emergency Relief',
+                    'source_ar': 'تصريف طوارئ مصنع الإيثيلين',
+                    'destination': 'Atmosphere (combusted)',
+                    'destination_ar': 'الجو (محترق)'
+                }
+            },
+            {
+                'id': 'pe_flare',
+                'name': 'Polyethylene Plant Flare',
+                'name_ar': 'شعلة مصنع البولي إيثيلين',
+                'category': 'flares',
+                'flare_type': 'Steam assisted flare',
+                'flare_type_ar': 'شعلة مساعدة بالبخار',
+                'flow': 'Non-routine flaring',
+                'flow_ar': 'حرق غير روتيني',
+                'comment': 'Flaring just in cases of upsets, startup and S/D, not measured',
+                'comment_ar': 'الحرق فقط في حالات الاضطرابات والتشغيل والإيقاف، غير مقاس',
+                'is_measured': False,
+                'routing': {
+                    'source': 'PE Plant Emergency Relief',
+                    'source_ar': 'تصريف طوارئ مصنع البولي إيثيلين',
+                    'destination': 'Atmosphere (combusted)',
+                    'destination_ar': 'الجو (محترق)'
+                }
+            }
+        ],
+
+        'fuel_gas': [
+            {
+                'id': 'internal_offgas',
+                'name': 'Internal Offgases',
+                'name_ar': 'الغازات الداخلية',
+                'category': 'fuel',
+                'design_value': {'min': 11.314, 'max': 13.722},
+                'design_unit': 'T/hr',
+                'actual_value': {'min': 7.9, 'max': 9.6},
+                'actual_unit': 'T/hr',
+                'composition': {
+                    'H2': {'min': 75, 'max': 80},
+                    'CH4': {'min': 19, 'max': 24},
+                    'HCs': 0.5
+                },
+                'composition_unit': 'mol%',
+                'conditions': {'P': 3.2, 'P_unit': 'kg/cm²g', 'T': 36, 'T_unit': '°C'},
+                'data_source': 'Material Balance',
+                'comment': 'All offgas streams are mixed and used inside the fuel system. Ethydco imports natural gas in case of shortage.',
+                'comment_ar': 'جميع تيارات الغاز المتبقي تُخلط وتُستخدم في نظام الوقود. تستورد إيثيدكو الغاز الطبيعي عند النقص.',
+                'routing': {
+                    'source': 'H2 + CH4 Offgas Streams',
+                    'source_ar': 'تيارات H2 + CH4',
+                    'destination': 'Fuel Gas Mixing Drum → Furnaces',
+                    'destination_ar': 'خلاط الوقود → الأفران'
+                }
+            },
+            {
+                'id': 'natural_gas_import',
+                'name': 'Natural Gas (from GASCO)',
+                'name_ar': 'الغاز الطبيعي (من جاسكو)',
+                'category': 'fuel',
+                'design_value': None,
+                'actual_value': '8170 Ton (total imported since start of 2025)',
+                'actual_value_ar': '8170 طن (إجمالي المستورد منذ بداية 2025)',
+                'data_source': 'Measured',
+                'comment': 'Variable flow rate based on demand, imported in case of shortage in generated offgases',
+                'comment_ar': 'معدل تدفق متغير حسب الطلب، يُستورد عند نقص الغازات المولدة داخلياً',
+                'routing': {
+                    'source': 'GASCO Pipeline',
+                    'source_ar': 'خط أنابيب جاسكو',
+                    'destination': 'Fuel Gas Mixing Drum',
+                    'destination_ar': 'خلاط غاز الوقود'
+                }
+            },
+            {
+                'id': 'pygas_fuel',
+                'name': 'Pyrolysis Gasoline (as fuel)',
+                'name_ar': 'بنزين التكسير (كوقود)',
+                'category': 'fuel',
+                'design_value': {'min': 92, 'max': 393},
+                'design_unit': 'Kg/hr',
+                'actual_value': {'min': 64, 'max': 275},
+                'actual_unit': 'Kg/hr',
+                'composition': {
+                    'Toluene/Xylene/EB': 3.5,
+                    'C9-204°C': 48,
+                    'Styrene': 23,
+                    'PGO (204-288°C)': 20
+                },
+                'composition_unit': 'mol%',
+                'conditions': {'P': 0.97, 'P_unit': 'kg/cm²g', 'T': 80, 'T_unit': '°C'},
+                'data_source': 'Material Balance',
+                'routing': {
+                    'source': 'Quench Tower',
+                    'source_ar': 'برج التبريد',
+                    'destination': 'Fuel System / Fired Heaters',
+                    'destination_ar': 'نظام الوقود / السخانات'
+                }
+            }
+        ],
+
+        'other_gases': [
+            {
+                'id': 'amine_stripper',
+                'name': 'Amine Stripper Offgas',
+                'name_ar': 'غاز منزع الأمين',
+                'category': 'other',
+                'design_value': 23.2,
+                'design_unit': 'T/hr',
+                'actual_value': {'min': 16, 'max': 18},
+                'actual_unit': 'T/hr',
+                'composition': {
+                    'Ethane': 0.19,
+                    'CO2': 90,
+                    'H2S': 0.05,
+                    'Steam': 9
+                },
+                'composition_unit': 'mol%',
+                'conditions': {'P': 0.57, 'P_unit': 'kg/cm²g', 'T': 57, 'T_unit': '°C'},
+                'data_source': 'Material Balance',
+                'comment': 'CO2-rich stream directed to incinerator to burn H2S and HCs before releasing to atmosphere',
+                'comment_ar': 'تيار غني بـ CO2 يُوجه للمحرقة لحرق H2S والهيدروكربونات قبل الإطلاق للجو',
+                'definition_key': 'amine_stripper',
+                'routing': {
+                    'source': 'Amine Regeneration Unit',
+                    'source_ar': 'وحدة تجديد الأمين',
+                    'destination': 'Incinerator → Atmosphere',
+                    'destination_ar': 'المحرقة → الجو'
+                }
+            }
+        ]
+    }
+
+
+# ============================================================================
+# DEFINITIONS DATABASE
+# ============================================================================
+
+DEFINITIONS = {
+    'ethylene': {
+        'term': 'Ethylene',
+        'term_ar': 'الإيثيلين',
+        'simple': 'Basic building block for polyethylene plastics (C2H4)',
+        'simple_ar': 'اللبنة الأساسية لبلاستيك البولي إيثيلين',
+        'detailed': 'Ethylene (C2H4) is the simplest alkene and the world\'s most produced organic compound. Produced by steam cracking of hydrocarbons at 750-900°C. Polymer-grade ethylene has purity >99.9% and is the primary feedstock for polyethylene (PE). At ETHYDCO: 460,000 T/Year.'
+    },
+    'propylene': {
+        'term': 'Propylene',
+        'term_ar': 'البروبيلين',
+        'simple': 'Olefin used for polypropylene and chemicals (C3H6)',
+        'simple_ar': 'أوليفين يستخدم في البولي بروبيلين والكيماويات',
+        'detailed': 'Propylene (C3H6) is the second most important olefin. It\'s a byproduct of steam cracking, recovered in the C3s stream. At ETHYDCO, the C3s stream contains 69.5-74 mol% propylene and is used as fuel or exported.'
+    },
+    'butadiene': {
+        'term': '1,3-Butadiene',
+        'term_ar': 'البيوتادايين',
+        'simple': 'Diene used for synthetic rubber production (C4H6)',
+        'simple_ar': 'ثنائي الإيثيلين يستخدم في إنتاج المطاط الصناعي',
+        'detailed': '1,3-Butadiene is a conjugated diene extracted from the C4 stream of steam crackers. Used for synthetic rubber (SBR, polybutadiene, NBR). ETHYDCO produces 20,000 T/Year using extractive distillation.'
+    },
+    'pyrolysis_gasoline': {
+        'term': 'Pyrolysis Gasoline',
+        'term_ar': 'بنزين التكسير',
+        'simple': 'Liquid byproduct from cracking, rich in aromatics',
+        'simple_ar': 'منتج سائل من التكسير غني بالعطريات',
+        'detailed': 'Pyrolysis gasoline (PyGas) is condensed from cracker effluent. Rich in aromatics (BTX), styrene, and heavy components. At ETHYDCO: 70-250 Kg/hr from quench tower, used as fuel.'
+    },
+    'h2_offgas': {
+        'term': 'H2 Offgas',
+        'term_ar': 'غاز الهيدروجين',
+        'simple': 'Hydrogen-rich stream from cold box separation',
+        'simple_ar': 'تيار غني بالهيدروجين من الفصل المبرد',
+        'detailed': 'H2 offgas is recovered from the cold box cryogenic unit. At ETHYDCO: 87-90 mol% H2 with CH4 and CO. Design: 6.812 T/hr, Actual: 4-4.5 T/hr. Used as fuel in cracker furnaces.'
+    },
+    'methane_offgas': {
+        'term': 'Methane Offgas',
+        'term_ar': 'غاز الميثان',
+        'simple': 'Methane-rich stream from demethanizer column',
+        'simple_ar': 'تيار غني بالميثان من عمود إزالة الميثان',
+        'detailed': 'Methane offgas is the overhead from the demethanizer column. At ETHYDCO: 76-82.5 mol% CH4, 17-22 mol% H2. Design: 4.5-6.2 T/hr, Actual: 3-4.5 T/hr. Used as fuel gas.'
+    },
+    'lpg': {
+        'term': 'LPG',
+        'term_ar': 'غاز البترول المسال',
+        'simple': 'Liquefied Petroleum Gas - propane and butane mixture',
+        'simple_ar': 'خليط البروبان والبيوتان',
+        'detailed': 'LPG consists of propane (C3) and butane (C4). At ETHYDCO, C3s and C4s streams are byproducts that can be marketed as LPG or used as fuel. C4s: 0.7 T/hr actual.'
+    },
+    'cracker': {
+        'term': 'Steam Cracker',
+        'term_ar': 'التكسير البخاري',
+        'simple': 'Unit that breaks down hydrocarbons into olefins',
+        'simple_ar': 'وحدة تحول الهيدروكربونات إلى أوليفينات',
+        'detailed': 'Steam crackers thermally decompose hydrocarbons at 750-900°C with steam. Cracked gas is cooled and separated to recover ethylene, propylene, and other products. ETHYDCO uses ethane/propane feed (95/5 wt%).'
+    },
+    'cold_box': {
+        'term': 'Cold Box',
+        'term_ar': 'الصندوق البارد',
+        'simple': 'Cryogenic separation unit for light gases',
+        'simple_ar': 'وحدة فصل مبردة للغازات الخفيفة',
+        'detailed': 'The cold box operates at -100 to -160°C to separate H2 and CH4 from cracked gas. Uses multi-stage heat exchangers and expanders. Produces H2 offgas and feeds the demethanizer.'
+    },
+    'demethanizer': {
+        'term': 'Demethanizer',
+        'term_ar': 'عمود إزالة الميثان',
+        'simple': 'Column separating methane from heavier hydrocarbons',
+        'simple_ar': 'عمود لفصل الميثان عن الهيدروكربونات الثقيلة',
+        'detailed': 'The demethanizer is a high-pressure distillation column separating CH4 overhead from C2+ bottoms. Operates at cryogenic temperatures. Overhead is methane offgas; bottoms proceed to deethanizer.'
+    },
+    'amine_stripper': {
+        'term': 'Amine Stripper',
+        'term_ar': 'منزع الأمين',
+        'simple': 'Regenerator for amine solution by stripping CO2/H2S',
+        'simple_ar': 'وحدة تجديد محلول الأمين بإزالة CO2/H2S',
+        'detailed': 'The amine stripper regenerates rich amine by heating to release CO2 and H2S. At ETHYDCO: Offgas is 90 mol% CO2 with H2S traces, sent to incinerator. Design: 23.2 T/hr, Actual: 16-18 T/hr.'
+    },
+    'quench_tower': {
+        'term': 'Quench Tower',
+        'term_ar': 'برج التبريد السريع',
+        'simple': 'Rapid cooling unit for hot cracked gas',
+        'simple_ar': 'وحدة تبريد سريع لغاز التكسير الساخن',
+        'detailed': 'The quench tower rapidly cools cracker effluent from ~850°C to ~40°C using circulating oil/water. Stops secondary reactions and condenses pyrolysis gasoline. Cooled gas proceeds to compression.'
+    }
+}
+
 
 # ============================================================================
 # DATA EXTRACTION
@@ -445,7 +952,556 @@ def create_methanol_allocation(metrics, lang='en'):
 
 
 # ============================================================================
-# HTML GENERATION
+# ETHYDCO KNOWLEDGE BASE CHARTS
+# ============================================================================
+
+def get_numeric_value(val):
+    """Extract numeric value from design/actual value (handles ranges)."""
+    if val is None:
+        return None
+    if isinstance(val, dict) and 'min' in val:
+        return (val['min'] + val['max']) / 2
+    if isinstance(val, (int, float)):
+        return val
+    return None
+
+def create_design_actual_chart(ethydco_data, lang='en'):
+    """Create grouped bar chart comparing design vs actual capacity."""
+    items = []
+    design_vals = []
+    actual_vals = []
+
+    # Collect all items with both design and actual values
+    all_items = (ethydco_data['feeds'] + ethydco_data['products'] +
+                 ethydco_data['fuel_gas'] + ethydco_data['other_gases'])
+
+    for item in all_items:
+        design = get_numeric_value(item.get('design_value'))
+        actual = get_numeric_value(item.get('actual_value'))
+
+        if design is not None and actual is not None:
+            name = item.get('name_ar' if lang == 'ar' else 'name', item['name'])
+            # Truncate long names
+            if len(name) > 25:
+                name = name[:22] + '...'
+            items.append(name)
+
+            # Normalize units to T/hr for comparison
+            design_unit = item.get('design_unit', '')
+            actual_unit = item.get('actual_unit', design_unit)
+
+            # Convert Kg/hr to T/hr
+            if 'Kg' in design_unit:
+                design = design / 1000
+            if 'Kg' in actual_unit:
+                actual = actual / 1000
+            # Convert T/Year to T/hr
+            if 'Year' in design_unit:
+                design = design / OPERATING_HOURS_PER_YEAR
+            if 'Year' in actual_unit:
+                actual = actual / OPERATING_HOURS_PER_YEAR
+
+            design_vals.append(design)
+            actual_vals.append(actual)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        name='Design' if lang == 'en' else 'التصميم',
+        x=items,
+        y=design_vals,
+        marker_color='#0ea5e9',
+        text=[f'{v:.1f}' for v in design_vals],
+        textposition='outside',
+        textfont=dict(size=10, color='#f1f5f9')
+    ))
+
+    fig.add_trace(go.Bar(
+        name='Actual' if lang == 'en' else 'الفعلي',
+        x=items,
+        y=actual_vals,
+        marker_color='#22c55e',
+        text=[f'{v:.1f}' for v in actual_vals],
+        textposition='outside',
+        textfont=dict(size=10, color='#f1f5f9')
+    ))
+
+    fig.update_layout(
+        barmode='group',
+        xaxis=dict(tickangle=-45, tickfont=dict(size=9, color='#f1f5f9')),
+        yaxis=dict(
+            title=dict(text='T/hr' if lang == 'en' else 'طن/ساعة', font=dict(size=10, color='#f1f5f9')),
+            gridcolor='rgba(255,255,255,0.1)',
+            tickfont=dict(size=10, color='#f1f5f9')
+        ),
+        legend=dict(orientation='h', y=1.15, xanchor='center', x=0.5, font=dict(size=11, color='#f1f5f9')),
+        margin=dict(t=60, b=120, l=60, r=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        height=400,
+        bargap=0.2
+    )
+
+    return fig
+
+
+def create_routing_sankey(ethydco_data, lang='en'):
+    """Create Sankey diagram showing stream routing at ETHYDCO."""
+
+    if lang == 'ar':
+        nodes = [
+            'خط جاسكو',           # 0
+            'التنقية',            # 1
+            'التكسير البخاري',    # 2
+            'الصندوق البارد',     # 3
+            'عمود الميثان',       # 4
+            'عمود C3',           # 5
+            'عمود C4',           # 6
+            'برج التبريد',        # 7
+            'منزع الأمين',        # 8
+            'مصنع PE',           # 9
+            'وحدة البيوتادايين',  # 10
+            'نظام الوقود',        # 11
+            'المحرقة',            # 12
+            'التصدير'             # 13
+        ]
+    else:
+        nodes = [
+            'GASCO Pipeline',      # 0
+            'Purification',        # 1
+            'Steam Crackers',      # 2
+            'Cold Box',            # 3
+            'Demethanizer',        # 4
+            'De-C3 Column',        # 5
+            'De-C4 Column',        # 6
+            'Quench Tower',        # 7
+            'Amine Stripper',      # 8
+            'PE Plant',            # 9
+            'Butadiene Unit',      # 10
+            'Fuel Gas System',     # 11
+            'Incinerator',         # 12
+            'Export'               # 13
+        ]
+
+    # Define links (source, target, value in T/hr equivalent)
+    links = [
+        (0, 1, 70),    # GASCO -> Purification (Feed)
+        (1, 2, 70),    # Purification -> Crackers
+        (2, 3, 30),    # Crackers -> Cold Box
+        (2, 4, 25),    # Crackers -> Demethanizer
+        (2, 7, 5),     # Crackers -> Quench Tower
+        (3, 11, 4.5),  # Cold Box -> Fuel (H2 offgas)
+        (3, 4, 20),    # Cold Box -> Demethanizer
+        (4, 11, 4),    # Demethanizer -> Fuel (CH4 offgas)
+        (4, 5, 15),    # Demethanizer -> De-C3
+        (5, 11, 2.5),  # De-C3 -> Fuel (C3s)
+        (5, 6, 10),    # De-C3 -> De-C4
+        (6, 10, 5),    # De-C4 -> Butadiene Unit
+        (6, 13, 0.7),  # De-C4 -> Export (C4s)
+        (10, 13, 2.5), # Butadiene -> Export
+        (3, 9, 57.5),  # Cold Box -> PE Plant (Ethylene)
+        (7, 11, 0.2),  # Quench Tower -> Fuel (PyGas)
+        (8, 12, 17),   # Amine Stripper -> Incinerator
+        (0, 11, 1),    # GASCO -> Fuel (NG import)
+    ]
+
+    source = [l[0] for l in links]
+    target = [l[1] for l in links]
+    value = [l[2] for l in links]
+
+    node_colors = [
+        '#f59e0b',  # GASCO - orange
+        '#8b5cf6',  # Purification - purple
+        '#ef4444',  # Crackers - red
+        '#0ea5e9',  # Cold Box - blue
+        '#0ea5e9',  # Demethanizer - blue
+        '#06b6d4',  # De-C3 - cyan
+        '#06b6d4',  # De-C4 - cyan
+        '#f97316',  # Quench - orange
+        '#64748b',  # Amine Stripper - gray
+        '#22c55e',  # PE Plant - green
+        '#8b5cf6',  # Butadiene - purple
+        '#22c55e',  # Fuel Gas - green
+        '#64748b',  # Incinerator - gray
+        '#22c55e',  # Export - green
+    ]
+
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(
+            pad=20,
+            thickness=20,
+            line=dict(color='white', width=1),
+            label=nodes,
+            color=node_colors
+        ),
+        link=dict(
+            source=source,
+            target=target,
+            value=value,
+            color='rgba(100,100,100,0.2)'
+        )
+    )])
+
+    fig.update_layout(
+        margin=dict(t=20, b=20, l=10, r=10),
+        paper_bgcolor='rgba(0,0,0,0)',
+        height=420,
+        font=dict(size=11, family='Inter', color='#f1f5f9')
+    )
+
+    return fig
+
+
+# ============================================================================
+# HTML GENERATION - KNOWLEDGE BASE
+# ============================================================================
+
+def format_value_display(value, unit=''):
+    """Format a value for display (handles ranges and None)."""
+    if value is None:
+        return 'N/A'
+    if isinstance(value, dict) and 'min' in value:
+        return f"{value['min']} - {value['max']}"
+    if isinstance(value, str):
+        return value
+    if isinstance(value, float):
+        if value >= 1000:
+            return f"{value:,.0f}"
+        return f"{value:.2f}"
+    return str(value)
+
+def format_composition_html(composition, comp_unit):
+    """Format composition data as HTML list."""
+    if not composition:
+        return ''
+
+    lines = []
+    for key, val in composition.items():
+        if isinstance(val, dict) and 'min' in val:
+            lines.append(f"<li><span class='comp-name'>{key}:</span> <span class='comp-val'>{val['min']}-{val['max']} {comp_unit}</span></li>")
+        else:
+            lines.append(f"<li><span class='comp-name'>{key}:</span> <span class='comp-val'>{val} {comp_unit}</span></li>")
+
+    return '<ul class="comp-list">' + ''.join(lines) + '</ul>'
+
+def generate_kb_cards(ethydco_data):
+    """Generate Knowledge Base expandable cards HTML."""
+    cards = []
+
+    # Combine all items
+    all_items = []
+    for item in ethydco_data['feeds']:
+        all_items.append(item)
+    for item in ethydco_data['products']:
+        all_items.append(item)
+    for item in ethydco_data['flared_gases']:
+        all_items.append(item)
+    for item in ethydco_data['fuel_gas']:
+        all_items.append(item)
+    for item in ethydco_data['other_gases']:
+        all_items.append(item)
+
+    for item in all_items:
+        item_id = item['id']
+        name = item['name']
+        name_ar = item.get('name_ar', name)
+        category = item['category']
+        data_source = item.get('data_source', '')
+
+        # Get design/actual values
+        design_val = item.get('design_value')
+        design_unit = item.get('design_unit', '')
+        actual_val = item.get('actual_value')
+        actual_unit = item.get('actual_unit', design_unit)
+
+        # Format display values
+        design_display = format_value_display(design_val)
+        actual_display = format_value_display(actual_val)
+
+        # Calculate utilization percentage for progress bar
+        design_num = get_numeric_value(design_val)
+        actual_num = get_numeric_value(actual_val)
+        if design_num and actual_num and design_num > 0:
+            utilization_pct = min(100, (actual_num / design_num) * 100)
+        else:
+            utilization_pct = 0
+
+        # Get composition
+        composition = item.get('composition', {})
+        comp_unit = item.get('composition_unit', '')
+        composition_html = format_composition_html(composition, comp_unit)
+
+        # Get conditions
+        conditions = item.get('conditions', {})
+        conditions_html = ''
+        if conditions:
+            cond_items = []
+            if 'P' in conditions:
+                p_unit = conditions.get('P_unit', 'kg/cm²g')
+                cond_items.append(f"<div class='condition-item'><span class='cond-label'>P</span><span class='cond-value'>{conditions['P']} {p_unit}</span></div>")
+            if 'T' in conditions:
+                t_unit = conditions.get('T_unit', '°C')
+                cond_items.append(f"<div class='condition-item'><span class='cond-label'>T</span><span class='cond-value'>{conditions['T']} {t_unit}</span></div>")
+            if 'pressure' in conditions:
+                p_data = conditions['pressure']
+                if isinstance(p_data, dict):
+                    cond_items.append(f"<div class='condition-item'><span class='cond-label'>P (min)</span><span class='cond-value'>{p_data['min']} {p_data.get('unit', '')}</span></div>")
+            if 'temperature' in conditions:
+                cond_items.append(f"<div class='condition-item'><span class='cond-label'>T</span><span class='cond-value'>{conditions['temperature']}</span></div>")
+            if 'phase' in conditions:
+                cond_items.append(f"<div class='condition-item'><span class='cond-label'>Phase</span><span class='cond-value'>{conditions['phase']}</span></div>")
+            conditions_html = ''.join(cond_items)
+
+        # Get routing
+        routing = item.get('routing', {})
+        routing_html = ''
+        if routing:
+            source = routing.get('source', '')
+            source_ar = routing.get('source_ar', source)
+            dest = routing.get('destination', '')
+            dest_ar = routing.get('destination_ar', dest)
+            routing_html = f'''
+            <div class="routing-section">
+                <h4 class="en-only">Stream Routing</h4>
+                <h4 class="ar-only">مسار التيار</h4>
+                <div class="routing-flow">
+                    <div class="route-node source">
+                        <span class="en-only">{source}</span>
+                        <span class="ar-only">{source_ar}</span>
+                    </div>
+                    <div class="route-arrow">→</div>
+                    <div class="route-node destination">
+                        <span class="en-only">{dest}</span>
+                        <span class="ar-only">{dest_ar}</span>
+                    </div>
+                </div>
+            </div>
+            '''
+
+        # Get comments
+        comment = item.get('comment', '')
+        comment_ar = item.get('comment_ar', comment)
+        comment_html = ''
+        if comment:
+            comment_html = f'''
+            <div class="comments-section">
+                <h4 class="en-only">Notes</h4>
+                <h4 class="ar-only">ملاحظات</h4>
+                <p class="en-only">{comment}</p>
+                <p class="ar-only">{comment_ar}</p>
+            </div>
+            '''
+
+        # Get definition
+        def_key = item.get('definition_key', '')
+        definition_html = ''
+        if def_key and def_key in DEFINITIONS:
+            defn = DEFINITIONS[def_key]
+            definition_html = f'''
+            <div class="definition-toggle" onclick="toggleDefinition(this)">
+                <span class="en-only">📖 What is {defn['term']}?</span>
+                <span class="ar-only">📖 ما هو {defn['term_ar']}؟</span>
+                <span class="toggle-icon">+</span>
+            </div>
+            <div class="definition-content">
+                <p class="simple-def en-only">{defn['simple']}</p>
+                <p class="simple-def ar-only">{defn['simple_ar']}</p>
+                <div class="detailed-def">
+                    <p>{defn['detailed']}</p>
+                </div>
+            </div>
+            '''
+
+        # Handle special items (impurities, limitations, flares)
+        special_content = ''
+        if 'fresh_feed' in item:
+            fresh = item['fresh_feed']
+            treated = item['treated_feed']
+            special_content = f'''
+            <div class="special-section">
+                <h4 class="en-only">Fresh Feed (from GASCO)</h4>
+                <h4 class="ar-only">التغذية الطازجة (من جاسكو)</h4>
+                <ul class="comp-list">
+                    <li>CO2: {fresh['CO2']['value']} {fresh['CO2']['unit']}</li>
+                    <li>H2S: {fresh['H2S']['value']} {fresh['H2S']['unit']}</li>
+                    <li>Hg: {fresh['Hg']['value']} {fresh['Hg']['unit']}</li>
+                </ul>
+                <h4 class="en-only" style="margin-top:15px;">Treated Feed (to Crackers)</h4>
+                <h4 class="ar-only" style="margin-top:15px;">التغذية المعالجة (للتكسير)</h4>
+                <ul class="comp-list">
+                    <li>CO2: {treated['CO2']['value']} {treated['CO2']['unit']}</li>
+                    <li>H2S: {treated['H2S']}</li>
+                    <li>Hg: {treated['Hg']}</li>
+                </ul>
+            </div>
+            '''
+
+        if 'limitations' in item:
+            lims = item['limitations']
+            lims_ar = item.get('limitations_ar', lims)
+            lim_items_en = ''.join([f'<li>{l}</li>' for l in lims])
+            lim_items_ar = ''.join([f'<li>{l}</li>' for l in lims_ar])
+            special_content = f'''
+            <div class="special-section">
+                <h4 class="en-only">Feed Limitations</h4>
+                <h4 class="ar-only">قيود التغذية</h4>
+                <ul class="comp-list en-only">{lim_items_en}</ul>
+                <ul class="comp-list ar-only">{lim_items_ar}</ul>
+            </div>
+            '''
+
+        if 'flare_type' in item:
+            special_content = f'''
+            <div class="special-section">
+                <div class="data-row">
+                    <span class="en-only">Flare Type:</span>
+                    <span class="ar-only">نوع الشعلة:</span>
+                    <span class="en-only">{item['flare_type']}</span>
+                    <span class="ar-only">{item.get('flare_type_ar', item['flare_type'])}</span>
+                </div>
+                <div class="data-row">
+                    <span class="en-only">Operation:</span>
+                    <span class="ar-only">التشغيل:</span>
+                    <span class="en-only">{item['flow']}</span>
+                    <span class="ar-only">{item.get('flow_ar', item['flow'])}</span>
+                </div>
+                <div class="data-row">
+                    <span class="en-only">Measured:</span>
+                    <span class="ar-only">مقاس:</span>
+                    <span>{'No' if not item.get('is_measured', False) else 'Yes'}</span>
+                </div>
+            </div>
+            '''
+
+        if 'description' in item:
+            special_content = f'''
+            <div class="special-section">
+                <p class="en-only">{item['description']}</p>
+                <p class="ar-only">{item.get('description_ar', item['description'])}</p>
+            </div>
+            '''
+
+        # Generate card icon based on category
+        icon_map = {
+            'feeds': '⚡',
+            'products': '📦',
+            'flares': '🔥',
+            'fuel': '⛽',
+            'other': '🌀'
+        }
+        icon = icon_map.get(category, '📋')
+
+        # Build capacity section if values exist
+        capacity_section = ''
+        if design_val is not None or actual_val is not None:
+            capacity_section = f'''
+            <div class="capacity-section">
+                <div class="capacity-row">
+                    <span class="label en-only">Design Capacity:</span>
+                    <span class="label ar-only">السعة التصميمية:</span>
+                    <span class="value design" data-value="{get_numeric_value(design_val) or ''}" data-unit="{design_unit}">{design_display} {design_unit}</span>
+                </div>
+                <div class="capacity-row">
+                    <span class="label en-only">Actual Capacity:</span>
+                    <span class="label ar-only">السعة الفعلية:</span>
+                    <span class="value actual" data-value="{get_numeric_value(actual_val) or ''}" data-unit="{actual_unit}">{actual_display} {actual_unit}</span>
+                </div>
+                <div class="capacity-bar">
+                    <div class="bar-fill" style="width: {utilization_pct:.0f}%"></div>
+                </div>
+                <div class="utilization-label" style="text-align:right; font-size:0.8rem; color:#64748b; margin-top:5px;">
+                    {utilization_pct:.0f}% <span class="en-only">utilization</span><span class="ar-only">استخدام</span>
+                </div>
+            </div>
+            '''
+
+        # Build composition section
+        comp_section = ''
+        if composition_html:
+            comp_section = f'''
+            <div class="composition-section">
+                <h4 class="en-only">Composition ({comp_unit})</h4>
+                <h4 class="ar-only">التركيب ({comp_unit})</h4>
+                {composition_html}
+                <div class="comp-chart" id="comp-{item_id}"></div>
+            </div>
+            '''
+
+        # Build conditions section
+        cond_section = ''
+        if conditions_html:
+            cond_section = f'''
+            <div class="conditions-section">
+                <h4 class="en-only">Operating Conditions</h4>
+                <h4 class="ar-only">ظروف التشغيل</h4>
+                <div class="conditions-grid">
+                    {conditions_html}
+                </div>
+            </div>
+            '''
+
+        # Build complete card
+        card = f'''
+        <div class="kb-card" data-category="{category}" data-id="{item_id}"
+             data-design-value="{get_numeric_value(design_val) or ''}"
+             data-design-unit="{design_unit}"
+             data-actual-value="{get_numeric_value(actual_val) or ''}"
+             data-actual-unit="{actual_unit}">
+            <div class="kb-card-header" onclick="toggleCard(this)">
+                <div class="kb-card-icon">{icon}</div>
+                <div class="kb-card-title">
+                    <h3 class="en-only">{name}</h3>
+                    <h3 class="ar-only">{name_ar}</h3>
+                    <span class="kb-card-subtitle">{category.title()} | {data_source}</span>
+                </div>
+                <div class="kb-card-summary">
+                    <div class="summary-value">
+                        <span class="design-value">{design_display if design_val else ''}</span>
+                        <span class="actual-value">{actual_display if actual_val else ''}</span>
+                        <span class="unit">{design_unit}</span>
+                    </div>
+                </div>
+                <div class="kb-card-expand">
+                    <span class="expand-icon">▼</span>
+                </div>
+            </div>
+            <div class="kb-card-body">
+                {capacity_section}
+                {special_content}
+                {comp_section}
+                {cond_section}
+                {routing_html}
+                {definition_html}
+                {comment_html}
+            </div>
+        </div>
+        '''
+        cards.append(card)
+
+    return ''.join(cards)
+
+
+def generate_definitions_html():
+    """Generate definitions/glossary section HTML."""
+    cards = []
+    for key, defn in DEFINITIONS.items():
+        card = f'''
+        <div class="def-card" onclick="toggleDefCard(this)">
+            <div class="def-term en-only">{defn['term']}</div>
+            <div class="def-term ar-only">{defn['term_ar']}</div>
+            <div class="def-simple en-only">{defn['simple']}</div>
+            <div class="def-simple ar-only">{defn['simple_ar']}</div>
+            <div class="def-detailed" style="display:none;">
+                <p>{defn['detailed']}</p>
+            </div>
+        </div>
+        '''
+        cards.append(card)
+    return ''.join(cards)
+
+
+# ============================================================================
+# HTML GENERATION - ORIGINAL DASHBOARD
 # ============================================================================
 
 def generate_stream_cards(metrics):
@@ -482,6 +1538,11 @@ def generate_html(metrics):
     stream_cards_html = generate_stream_cards(metrics)
     prices_table_html = generate_prices_table(metrics)
 
+    # Load ETHYDCO data and generate Knowledge Base content
+    ethydco_data = load_ethydco_data()
+    kb_cards_html = generate_kb_cards(ethydco_data)
+    definitions_html = generate_definitions_html()
+
     # Pre-generate all charts for both languages
     charts = {
         'en': {
@@ -493,7 +1554,9 @@ def generate_html(metrics):
             'gauge_max': create_gauge(metrics['calc3']['coverage_max'], 100, 'Max Coverage', 'en'),
             'h2_balance': create_h2_balance(metrics, 'en'),
             'heatmap': create_stream_heatmap(metrics, 'en'),
-            'methanol': create_methanol_allocation(metrics, 'en')
+            'methanol': create_methanol_allocation(metrics, 'en'),
+            'kb_design_actual': create_design_actual_chart(ethydco_data, 'en'),
+            'kb_routing': create_routing_sankey(ethydco_data, 'en')
         },
         'ar': {
             'donut': create_phase_donut(metrics, 'ar'),
@@ -504,7 +1567,9 @@ def generate_html(metrics):
             'gauge_max': create_gauge(metrics['calc3']['coverage_max'], 100, 'تغطية الحد الأقصى', 'ar'),
             'h2_balance': create_h2_balance(metrics, 'ar'),
             'heatmap': create_stream_heatmap(metrics, 'ar'),
-            'methanol': create_methanol_allocation(metrics, 'ar')
+            'methanol': create_methanol_allocation(metrics, 'ar'),
+            'kb_design_actual': create_design_actual_chart(ethydco_data, 'ar'),
+            'kb_routing': create_routing_sankey(ethydco_data, 'ar')
         }
     }
 
@@ -512,6 +1577,11 @@ def generate_html(metrics):
     total_value = metrics['summary']['total_net']
     phase12 = metrics['summary']['phase12_net']
     phase34 = metrics['summary']['phase34_net']
+
+    # ETHYDCO company info
+    company_name = ethydco_data['company_info']['name']
+    company_full = ethydco_data['company_info']['full_name']
+    company_scope = ethydco_data['company_info']['scope']
 
     html = f'''<!DOCTYPE html>
 <html lang="en">
@@ -1168,6 +2238,645 @@ def generate_html(metrics):
         .ar-only {{ display: none; }}
         .rtl .en-only {{ display: none; }}
         .rtl .ar-only {{ display: block; }}
+
+        /* ============================================
+           KNOWLEDGE BASE TAB STYLES
+           ============================================ */
+
+        /* KB Header */
+        .kb-header {{
+            margin-bottom: 25px;
+        }}
+
+        .company-info-card {{
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 30px;
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin-bottom: 20px;
+        }}
+
+        .company-logo {{
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: 800;
+            color: white;
+            box-shadow: 0 10px 30px rgba(34, 197, 94, 0.3);
+            flex-shrink: 0;
+        }}
+
+        .company-details h2 {{
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+            background: linear-gradient(90deg, var(--white) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }}
+
+        .company-details p {{
+            color: var(--gray);
+            font-size: 1rem;
+        }}
+
+        /* KB Controls */
+        .kb-controls {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }}
+
+        .search-box {{
+            position: relative;
+            flex: 1;
+            max-width: 400px;
+        }}
+
+        .search-box input {{
+            width: 100%;
+            padding: 14px 20px 14px 50px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: var(--white);
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.3s ease;
+        }}
+
+        .search-box input:focus {{
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.2);
+        }}
+
+        .search-box .search-icon {{
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2rem;
+        }}
+
+        .rtl .search-box .search-icon {{
+            left: auto;
+            right: 18px;
+        }}
+
+        .rtl .search-box input {{
+            padding: 14px 50px 14px 20px;
+        }}
+
+        /* Unit Toggle */
+        .unit-toggle {{
+            display: flex;
+            background: var(--glass);
+            border-radius: 10px;
+            padding: 4px;
+            border: 1px solid var(--glass-border);
+        }}
+
+        .unit-btn {{
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--gray);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }}
+
+        .unit-btn.active {{
+            background: var(--primary);
+            color: var(--white);
+        }}
+
+        /* Category Navigation */
+        .category-nav {{
+            display: flex;
+            gap: 10px;
+            padding: 20px 0;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--glass-border);
+            margin-bottom: 25px;
+        }}
+
+        .cat-btn {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            color: var(--gray);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }}
+
+        .cat-btn:hover {{
+            background: rgba(14, 165, 233, 0.15);
+            border-color: var(--primary);
+            color: var(--white);
+        }}
+
+        .cat-btn.active {{
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-color: transparent;
+            color: var(--white);
+        }}
+
+        .cat-icon {{
+            font-size: 1.1rem;
+        }}
+
+        .cat-count {{
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }}
+
+        /* KB Cards Grid */
+        .kb-cards-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }}
+
+        /* KB Card */
+        .kb-card {{
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }}
+
+        .kb-card:hover {{
+            border-color: var(--primary);
+            box-shadow: 0 10px 40px rgba(14, 165, 233, 0.15);
+        }}
+
+        .kb-card.hidden {{
+            display: none;
+        }}
+
+        .kb-card-header {{
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            cursor: pointer;
+            gap: 15px;
+            border-bottom: 1px solid transparent;
+            transition: all 0.3s ease;
+        }}
+
+        .kb-card.expanded .kb-card-header {{
+            border-bottom-color: var(--glass-border);
+        }}
+
+        .kb-card-icon {{
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }}
+
+        .kb-card-title {{
+            flex: 1;
+            min-width: 0;
+        }}
+
+        .kb-card-title h3 {{
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
+        .kb-card-subtitle {{
+            font-size: 0.8rem;
+            color: var(--gray);
+        }}
+
+        .kb-card-summary {{
+            text-align: right;
+            flex-shrink: 0;
+        }}
+
+        .rtl .kb-card-summary {{
+            text-align: left;
+        }}
+
+        .summary-value {{
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+        }}
+
+        .rtl .summary-value {{
+            align-items: flex-start;
+        }}
+
+        .summary-value .design-value {{
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--secondary);
+        }}
+
+        .summary-value .actual-value {{
+            font-size: 0.85rem;
+            color: var(--success);
+        }}
+
+        .summary-value .unit {{
+            font-size: 0.75rem;
+            color: var(--gray);
+        }}
+
+        .kb-card-expand {{
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }}
+
+        .expand-icon {{
+            transition: transform 0.3s ease;
+            color: var(--gray);
+        }}
+
+        .kb-card.expanded .expand-icon {{
+            transform: rotate(180deg);
+        }}
+
+        /* Card Body */
+        .kb-card-body {{
+            display: none;
+            padding: 20px;
+            animation: slideDown 0.3s ease;
+        }}
+
+        .kb-card.expanded .kb-card-body {{
+            display: block;
+        }}
+
+        @keyframes slideDown {{
+            from {{ opacity: 0; transform: translateY(-10px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
+
+        /* Capacity Section */
+        .capacity-section {{
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+        }}
+
+        .capacity-row {{
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }}
+
+        .capacity-row .label {{
+            color: var(--gray);
+        }}
+
+        .capacity-row .value.design {{
+            color: var(--secondary);
+            font-weight: 600;
+        }}
+
+        .capacity-row .value.actual {{
+            color: var(--success);
+            font-weight: 600;
+        }}
+
+        .capacity-bar {{
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }}
+
+        .bar-fill {{
+            height: 100%;
+            background: linear-gradient(90deg, var(--success) 0%, var(--secondary) 100%);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }}
+
+        /* Composition Section */
+        .composition-section, .conditions-section, .routing-section, .special-section {{
+            margin-bottom: 20px;
+        }}
+
+        .composition-section h4, .conditions-section h4, .routing-section h4, .special-section h4 {{
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-bottom: 10px;
+        }}
+
+        .comp-list {{
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }}
+
+        .comp-list li {{
+            padding: 6px 0;
+            border-bottom: 1px dashed rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }}
+
+        .comp-list li:last-child {{
+            border-bottom: none;
+        }}
+
+        .comp-name {{
+            color: var(--gray);
+        }}
+
+        .comp-val {{
+            color: var(--white);
+            font-weight: 500;
+        }}
+
+        .comp-chart {{
+            margin-top: 15px;
+            height: 180px;
+        }}
+
+        /* Conditions Grid */
+        .conditions-grid {{
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }}
+
+        .condition-item {{
+            background: rgba(14, 165, 233, 0.1);
+            padding: 10px 15px;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }}
+
+        .cond-label {{
+            font-weight: 600;
+            color: var(--secondary);
+        }}
+
+        .cond-value {{
+            color: var(--white);
+        }}
+
+        /* Routing Section */
+        .routing-flow {{
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }}
+
+        .route-node {{
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }}
+
+        .route-node.source {{
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #f59e0b;
+        }}
+
+        .route-node.destination {{
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }}
+
+        .route-arrow {{
+            font-size: 1.5rem;
+            color: var(--gray);
+        }}
+
+        /* Definition Toggle */
+        .definition-toggle {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: rgba(138, 92, 246, 0.1);
+            border: 1px solid rgba(138, 92, 246, 0.2);
+            border-radius: 10px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }}
+
+        .definition-toggle:hover {{
+            background: rgba(138, 92, 246, 0.15);
+        }}
+
+        .toggle-icon {{
+            font-size: 1.2rem;
+            color: var(--gray);
+            transition: transform 0.3s ease;
+        }}
+
+        .definition-toggle.expanded .toggle-icon {{
+            transform: rotate(45deg);
+        }}
+
+        .definition-content {{
+            padding: 0 15px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }}
+
+        .definition-toggle.expanded + .definition-content {{
+            max-height: 300px;
+            padding: 15px;
+        }}
+
+        .simple-def {{
+            color: var(--secondary);
+            font-weight: 500;
+            margin-bottom: 10px;
+        }}
+
+        .detailed-def {{
+            color: var(--gray);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            display: none;
+        }}
+
+        .definition-toggle.expanded + .definition-content .detailed-def {{
+            display: block;
+        }}
+
+        /* Comments Section */
+        .comments-section {{
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            border-left: 3px solid var(--accent);
+            margin-top: 15px;
+        }}
+
+        .rtl .comments-section {{
+            border-left: none;
+            border-right: 3px solid var(--accent);
+        }}
+
+        .comments-section h4 {{
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-bottom: 8px;
+        }}
+
+        .comments-section p {{
+            font-size: 0.9rem;
+            color: var(--light);
+            line-height: 1.5;
+        }}
+
+        /* Definitions Section */
+        .definitions-section {{
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid var(--glass-border);
+        }}
+
+        .definitions-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }}
+
+        .def-card {{
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }}
+
+        .def-card:hover {{
+            border-color: var(--secondary);
+        }}
+
+        .def-card.expanded {{
+            border-color: var(--primary);
+        }}
+
+        .def-term {{
+            font-weight: 600;
+            color: var(--secondary);
+            margin-bottom: 5px;
+        }}
+
+        .def-simple {{
+            font-size: 0.9rem;
+            color: var(--light);
+        }}
+
+        .def-detailed {{
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--glass-border);
+            font-size: 0.85rem;
+            color: var(--gray);
+            line-height: 1.5;
+        }}
+
+        /* KB Responsive */
+        @media (max-width: 900px) {{
+            .kb-cards-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            .company-info-card {{
+                flex-direction: column;
+                text-align: center;
+            }}
+
+            .kb-controls {{
+                flex-direction: column;
+            }}
+
+            .search-box {{
+                max-width: 100%;
+                width: 100%;
+            }}
+        }}
+
+        @media (max-width: 480px) {{
+            .category-nav {{
+                justify-content: center;
+            }}
+
+            .cat-btn {{
+                padding: 10px 14px;
+                font-size: 0.8rem;
+            }}
+
+            .kb-card-header {{
+                flex-wrap: wrap;
+            }}
+
+            .routing-flow {{
+                flex-direction: column;
+                align-items: flex-start;
+            }}
+
+            .route-arrow {{
+                transform: rotate(90deg);
+            }}
+        }}
     </style>
 </head>
 <body>
@@ -1205,6 +2914,10 @@ def generate_html(metrics):
         <button class="nav-btn" onclick="showTab('detailed')">
             <span class="en-only">Detailed Data</span>
             <span class="ar-only">البيانات التفصيلية</span>
+        </button>
+        <button class="nav-btn" onclick="showTab('knowledge')">
+            <span class="en-only">ETHYDCO Knowledge Base</span>
+            <span class="ar-only">قاعدة معرفة إيثيدكو</span>
         </button>
     </nav>
 
@@ -1432,6 +3145,118 @@ def generate_html(metrics):
                 </table>
             </div>
         </div>
+
+        <!-- KNOWLEDGE BASE TAB -->
+        <div id="knowledge" class="tab-content">
+            <!-- Header Section with Company Info -->
+            <div class="kb-header">
+                <div class="company-info-card">
+                    <div class="company-logo">E</div>
+                    <div class="company-details">
+                        <h2 class="en-only">{company_name} - {company_full}</h2>
+                        <h2 class="ar-only">{ethydco_data['company_info']['name_ar']} - {ethydco_data['company_info']['full_name_ar']}</h2>
+                        <p class="en-only">{company_scope}</p>
+                        <p class="ar-only">{ethydco_data['company_info']['scope_ar']}</p>
+                    </div>
+                </div>
+
+                <!-- Controls Row -->
+                <div class="kb-controls">
+                    <!-- Search Box -->
+                    <div class="search-box">
+                        <input type="text" id="kb-search" placeholder="Search streams, products..." oninput="filterKB()">
+                        <span class="search-icon">🔍</span>
+                    </div>
+
+                    <!-- Unit Toggle -->
+                    <div class="unit-toggle">
+                        <button class="unit-btn active" onclick="setUnit('hourly')" data-unit="hourly">T/hr</button>
+                        <button class="unit-btn" onclick="setUnit('annual')" data-unit="annual">T/year</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Navigation -->
+            <div class="category-nav">
+                <button class="cat-btn active" onclick="filterCategory('all')" data-cat="all">
+                    <span class="en-only">All</span>
+                    <span class="ar-only">الكل</span>
+                    <span class="cat-count" id="count-all">17</span>
+                </button>
+                <button class="cat-btn" onclick="filterCategory('feeds')" data-cat="feeds">
+                    <span class="cat-icon">⚡</span>
+                    <span class="en-only">Feeds</span>
+                    <span class="ar-only">التغذية</span>
+                    <span class="cat-count" id="count-feeds">4</span>
+                </button>
+                <button class="cat-btn" onclick="filterCategory('products')" data-cat="products">
+                    <span class="cat-icon">📦</span>
+                    <span class="en-only">Products</span>
+                    <span class="ar-only">المنتجات</span>
+                    <span class="cat-count" id="count-products">7</span>
+                </button>
+                <button class="cat-btn" onclick="filterCategory('flares')" data-cat="flares">
+                    <span class="cat-icon">🔥</span>
+                    <span class="en-only">Flares</span>
+                    <span class="ar-only">الشعلات</span>
+                    <span class="cat-count" id="count-flares">2</span>
+                </button>
+                <button class="cat-btn" onclick="filterCategory('fuel')" data-cat="fuel">
+                    <span class="cat-icon">⛽</span>
+                    <span class="en-only">Fuel Gas</span>
+                    <span class="ar-only">غاز الوقود</span>
+                    <span class="cat-count" id="count-fuel">3</span>
+                </button>
+                <button class="cat-btn" onclick="filterCategory('other')" data-cat="other">
+                    <span class="cat-icon">🌀</span>
+                    <span class="en-only">Other</span>
+                    <span class="ar-only">أخرى</span>
+                    <span class="cat-count" id="count-other">1</span>
+                </button>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="kb-charts-section">
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">
+                            <span class="en-only">Design vs Actual Capacity</span>
+                            <span class="ar-only">السعة التصميمية مقابل الفعلية</span>
+                        </div>
+                        <div id="chart-kb-design-en"></div>
+                        <div id="chart-kb-design-ar"></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">
+                            <span class="en-only">ETHYDCO Process Flow</span>
+                            <span class="ar-only">مسار العمليات في إيثيدكو</span>
+                        </div>
+                        <div id="chart-kb-routing-en"></div>
+                        <div id="chart-kb-routing-ar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expandable Cards Grid -->
+            <div class="chart-title" style="margin: 30px 0 20px 0; font-size: 1.2rem;">
+                <span class="en-only">Stream & Product Details</span>
+                <span class="ar-only">تفاصيل التيارات والمنتجات</span>
+            </div>
+            <div class="kb-cards-grid" id="kb-cards-container">
+                {kb_cards_html}
+            </div>
+
+            <!-- Definitions Section -->
+            <div class="definitions-section">
+                <div class="chart-title" style="margin-bottom: 20px;">
+                    <span class="en-only">Glossary / Definitions</span>
+                    <span class="ar-only">المصطلحات والتعريفات</span>
+                </div>
+                <div class="definitions-grid" id="definitions-container">
+                    {definitions_html}
+                </div>
+            </div>
+        </div>
     </main>
 
     <footer class="footer">
@@ -1450,7 +3275,9 @@ def generate_html(metrics):
             gaugeMax: {charts['en']['gauge_max'].to_json()},
             h2: {charts['en']['h2_balance'].to_json()},
             heatmap: {charts['en']['heatmap'].to_json()},
-            methanol: {charts['en']['methanol'].to_json()}
+            methanol: {charts['en']['methanol'].to_json()},
+            kbDesign: {charts['en']['kb_design_actual'].to_json()},
+            kbRouting: {charts['en']['kb_routing'].to_json()}
         }};
 
         var chartsAR = {{
@@ -1462,11 +3289,16 @@ def generate_html(metrics):
             gaugeMax: {charts['ar']['gauge_max'].to_json()},
             h2: {charts['ar']['h2_balance'].to_json()},
             heatmap: {charts['ar']['heatmap'].to_json()},
-            methanol: {charts['ar']['methanol'].to_json()}
+            methanol: {charts['ar']['methanol'].to_json()},
+            kbDesign: {charts['ar']['kb_design_actual'].to_json()},
+            kbRouting: {charts['ar']['kb_routing'].to_json()}
         }};
 
         var config = {{responsive: true, displayModeBar: false}};
         var currentLang = 'en';
+        var currentCategory = 'all';
+        var currentUnit = 'hourly';
+        var OPERATING_HOURS = 8000;
 
         function renderCharts(lang) {{
             var charts = lang === 'ar' ? chartsAR : chartsEN;
@@ -1486,6 +3318,16 @@ def generate_html(metrics):
             Plotly.newPlot('chart-h2' + suffix, charts.h2.data, charts.h2.layout, config);
             Plotly.newPlot('chart-heatmap' + suffix, charts.heatmap.data, charts.heatmap.layout, config);
             Plotly.newPlot('chart-methanol' + suffix, charts.methanol.data, charts.methanol.layout, config);
+
+            // KB Charts
+            var kbDesignEl = document.getElementById('chart-kb-design' + suffix);
+            var kbRoutingEl = document.getElementById('chart-kb-routing' + suffix);
+            if (kbDesignEl) {{
+                Plotly.newPlot('chart-kb-design' + suffix, charts.kbDesign.data, charts.kbDesign.layout, config);
+            }}
+            if (kbRoutingEl) {{
+                Plotly.newPlot('chart-kb-routing' + suffix, charts.kbRouting.data, charts.kbRouting.layout, config);
+            }}
         }}
 
         function setLanguage(lang) {{
@@ -1508,7 +3350,142 @@ def generate_html(metrics):
             document.getElementById(tabId).classList.add('active');
             event.target.closest('.nav-btn').classList.add('active');
 
-            setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+            setTimeout(() => {{
+                window.dispatchEvent(new Event('resize'));
+                if (tabId === 'knowledge') {{
+                    renderCharts(currentLang);
+                }}
+            }}, 100);
+        }}
+
+        // ============================================
+        // KNOWLEDGE BASE FUNCTIONS
+        // ============================================
+
+        function toggleCard(header) {{
+            var card = header.closest('.kb-card');
+            card.classList.toggle('expanded');
+        }}
+
+        function toggleDefinition(toggle) {{
+            toggle.classList.toggle('expanded');
+        }}
+
+        function toggleDefCard(card) {{
+            var detailed = card.querySelector('.def-detailed');
+            if (detailed) {{
+                var isExpanded = detailed.style.display === 'block';
+                detailed.style.display = isExpanded ? 'none' : 'block';
+                card.classList.toggle('expanded', !isExpanded);
+            }}
+        }}
+
+        function filterCategory(category) {{
+            currentCategory = category;
+
+            // Update category buttons
+            document.querySelectorAll('.cat-btn').forEach(btn => {{
+                btn.classList.toggle('active', btn.dataset.cat === category);
+            }});
+
+            // Apply filter
+            applyFilters();
+        }}
+
+        function filterKB() {{
+            applyFilters();
+        }}
+
+        function applyFilters() {{
+            var searchTerm = (document.getElementById('kb-search').value || '').toLowerCase();
+            var cards = document.querySelectorAll('.kb-card');
+            var counts = {{ all: 0, feeds: 0, products: 0, flares: 0, fuel: 0, other: 0 }};
+
+            cards.forEach(card => {{
+                var category = card.dataset.category;
+                var text = card.textContent.toLowerCase();
+
+                var categoryMatch = currentCategory === 'all' || category === currentCategory;
+                var searchMatch = !searchTerm || text.includes(searchTerm);
+
+                var visible = categoryMatch && searchMatch;
+                card.classList.toggle('hidden', !visible);
+
+                if (visible) {{
+                    counts.all++;
+                    if (counts[category] !== undefined) counts[category]++;
+                }}
+            }});
+
+            // Update counts
+            Object.keys(counts).forEach(cat => {{
+                var el = document.getElementById('count-' + cat);
+                if (el) el.textContent = counts[cat];
+            }});
+        }}
+
+        function setUnit(unit) {{
+            currentUnit = unit;
+
+            // Update unit buttons
+            document.querySelectorAll('.unit-btn').forEach(btn => {{
+                btn.classList.toggle('active', btn.dataset.unit === unit);
+            }});
+
+            // Update displayed values
+            updateUnitDisplay();
+        }}
+
+        function updateUnitDisplay() {{
+            document.querySelectorAll('.kb-card').forEach(card => {{
+                var designVal = parseFloat(card.dataset.designValue);
+                var designUnit = card.dataset.designUnit || '';
+                var actualVal = parseFloat(card.dataset.actualValue);
+                var actualUnit = card.dataset.actualUnit || designUnit;
+
+                if (isNaN(designVal) && isNaN(actualVal)) return;
+
+                var designDisplay = card.querySelector('.summary-value .design-value');
+                var actualDisplay = card.querySelector('.summary-value .actual-value');
+                var unitDisplay = card.querySelector('.summary-value .unit');
+
+                if (currentUnit === 'annual') {{
+                    // Convert to annual
+                    var annualDesign = convertToAnnual(designVal, designUnit);
+                    var annualActual = convertToAnnual(actualVal, actualUnit);
+
+                    if (designDisplay && !isNaN(annualDesign)) {{
+                        designDisplay.textContent = formatNumber(annualDesign);
+                    }}
+                    if (actualDisplay && !isNaN(annualActual)) {{
+                        actualDisplay.textContent = formatNumber(annualActual);
+                    }}
+                    if (unitDisplay) unitDisplay.textContent = 'T/year';
+                }} else {{
+                    // Show original hourly values
+                    if (designDisplay && !isNaN(designVal)) {{
+                        designDisplay.textContent = formatNumber(designVal);
+                    }}
+                    if (actualDisplay && !isNaN(actualVal)) {{
+                        actualDisplay.textContent = formatNumber(actualVal);
+                    }}
+                    if (unitDisplay) unitDisplay.textContent = designUnit;
+                }}
+            }});
+        }}
+
+        function convertToAnnual(value, unit) {{
+            if (isNaN(value)) return NaN;
+            if (unit.includes('Year')) return value;
+            if (unit.includes('Kg')) return value * OPERATING_HOURS / 1000;
+            return value * OPERATING_HOURS; // T/hr -> T/year
+        }}
+
+        function formatNumber(num) {{
+            if (isNaN(num)) return 'N/A';
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toFixed(1);
         }}
 
         // Initial render
